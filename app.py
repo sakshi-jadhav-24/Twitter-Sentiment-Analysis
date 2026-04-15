@@ -3,7 +3,7 @@ import pickle
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
-import snscrape.modules.twitter as sntwitter
+from snscrape.modules.twitter import TwitterSearchScraper
 from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.corpus import stopwords
 import nltk
@@ -32,22 +32,24 @@ def get_tweets(keyword, count=5):
 
     try:
         query = keyword + " since:2024-01-01"
-        for i, tweet in enumerate(sntwitter.TwitterSearchScraper(query).get_items()):
+        scraper = TwitterSearchScraper(query)
+
+        for i, tweet in enumerate(scraper.get_items()):
             if i >= count:
                 break
             tweets.append(tweet.content)
 
-    except:
-        pass
+    except Exception as e:
+        st.warning("Live data fetch issue. Showing sample data.")
 
-    # fallback
+    # fallback (never empty)
     if len(tweets) == 0:
         tweets = [
             f"{keyword} is trending now!",
-            f"I love {keyword}, amazing updates!",
-            f"{keyword} news is shocking today",
-            f"Not happy with {keyword}",
-            f"{keyword} performance is great"
+            f"I love {keyword}!",
+            f"{keyword} news update",
+            f"{keyword} is bad",
+            f"{keyword} is amazing"
         ]
 
     return tweets
@@ -58,13 +60,15 @@ def get_user_tweets(username, count=5):
 
     try:
         query = f"from:{username}"
-        for i, tweet in enumerate(sntwitter.TwitterSearchScraper(query).get_items()):
+        scraper = TwitterSearchScraper(query)
+
+        for i, tweet in enumerate(scraper.get_items()):
             if i >= count:
                 break
             tweets.append(tweet.content)
 
-    except:
-        pass
+    except Exception:
+        st.warning("User tweets not available. Showing sample data.")
 
     if len(tweets) == 0:
         tweets = [f"{username} latest tweet..." for _ in range(5)]
@@ -137,13 +141,12 @@ def main():
 
             for t in tweets:
                 s = predict(t, model, vectorizer, stop_words)
-
                 if s == "Positive":
                     pos += 1
                 else:
                     neg += 1
 
-            # Metrics
+            # metrics
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Positive", pos)
@@ -154,7 +157,6 @@ def main():
 
             st.subheader("📝 Tweets")
 
-            # Scrollable tweets
             with st.container(height=300):
                 for t in tweets:
                     s = predict(t, model, vectorizer, stop_words)
@@ -166,8 +168,6 @@ def main():
 
         if st.button("Fetch User Tweets"):
             tweets = get_user_tweets(username)
-
-            st.subheader("📝 User Tweets")
 
             with st.container(height=300):
                 for t in tweets:
