@@ -1,23 +1,22 @@
 import streamlit as st
 import pickle
 import re
+import random
 import pandas as pd
 import matplotlib.pyplot as plt
-from snscrape.modules.twitter import TwitterSearchScraper
 from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.corpus import stopwords
 import nltk
 
-# -------------------- PAGE CONFIG --------------------
 st.set_page_config(page_title="Sentiment Dashboard", layout="centered")
 
-# -------------------- STOPWORDS --------------------
+# ---------------- STOPWORDS ----------------
 @st.cache_resource
 def load_stopwords():
     nltk.download('stopwords')
     return stopwords.words('english')
 
-# -------------------- MODEL --------------------
+# ---------------- MODEL ----------------
 @st.cache_resource
 def load_model():
     with open('model.pkl', 'rb') as f:
@@ -26,56 +25,25 @@ def load_model():
         vectorizer = pickle.load(f)
     return model, vectorizer
 
-# -------------------- FETCH TWEETS --------------------
-def get_tweets(keyword, count=5):
-    tweets = []
+# ---------------- FAKE REAL-TIME DATA ----------------
+def generate_tweets(keyword, count=5):
+    templates = [
+        f"{keyword} is amazing!",
+        f"I love {keyword} so much",
+        f"{keyword} is not good",
+        f"{keyword} trending worldwide",
+        f"People are talking about {keyword}",
+        f"{keyword} is disappointing",
+        f"Best experience with {keyword}",
+        f"Worst update about {keyword}"
+    ]
+    return random.sample(templates, count)
 
-    try:
-        query = keyword + " since:2024-01-01"
-        scraper = TwitterSearchScraper(query)
+# ---------------- USER DATA ----------------
+def generate_user_tweets(username, count=5):
+    return [f"{username} latest tweet {i}" for i in range(1, count+1)]
 
-        for i, tweet in enumerate(scraper.get_items()):
-            if i >= count:
-                break
-            tweets.append(tweet.content)
-
-    except Exception as e:
-        st.warning("Live data fetch issue. Showing sample data.")
-
-    # fallback (never empty)
-    if len(tweets) == 0:
-        tweets = [
-            f"{keyword} is trending now!",
-            f"I love {keyword}!",
-            f"{keyword} news update",
-            f"{keyword} is bad",
-            f"{keyword} is amazing"
-        ]
-
-    return tweets
-
-# -------------------- USER TWEETS --------------------
-def get_user_tweets(username, count=5):
-    tweets = []
-
-    try:
-        query = f"from:{username}"
-        scraper = TwitterSearchScraper(query)
-
-        for i, tweet in enumerate(scraper.get_items()):
-            if i >= count:
-                break
-            tweets.append(tweet.content)
-
-    except Exception:
-        st.warning("User tweets not available. Showing sample data.")
-
-    if len(tweets) == 0:
-        tweets = [f"{username} latest tweet..." for _ in range(5)]
-
-    return tweets
-
-# -------------------- PREDICT --------------------
+# ---------------- PREDICT ----------------
 def predict(text, model, vectorizer, stop_words):
     text = re.sub('[^a-zA-Z]', ' ', text)
     text = text.lower().split()
@@ -85,31 +53,30 @@ def predict(text, model, vectorizer, stop_words):
     pred = model.predict(text)
     return "Positive" if pred == 1 else "Negative"
 
-# -------------------- CARD --------------------
+# ---------------- CARD ----------------
 def card(text, sentiment):
     color = "#28a745" if sentiment=="Positive" else "#dc3545"
     return f"""
     <div style="background:{color};padding:6px;border-radius:8px;margin:5px 0;">
-        <b style="color:white;font-size:14px;">{sentiment}</b>
-        <p style="color:white;font-size:13px;">{text}</p>
+        <b style="color:white;">{sentiment}</b>
+        <p style="color:white;">{text}</p>
     </div>
     """
 
-# -------------------- CHART --------------------
+# ---------------- CHART ----------------
 def show_charts(pos, neg):
     df = pd.DataFrame({
         "Sentiment": ["Positive", "Negative"],
         "Count": [pos, neg]
     })
 
-    st.subheader("📊 Sentiment Summary")
     st.bar_chart(df.set_index("Sentiment"))
 
     fig, ax = plt.subplots()
     ax.pie(df["Count"], labels=df["Sentiment"], autopct='%1.1f%%')
     st.pyplot(fig)
 
-# -------------------- MAIN --------------------
+# ---------------- MAIN ----------------
 def main():
     st.title("🔥 Twitter Sentiment Dashboard")
 
@@ -125,17 +92,16 @@ def main():
     # -------- MANUAL --------
     if option == "Manual Text":
         text = st.text_area("Enter text")
-
         if st.button("Analyze"):
             result = predict(text, model, vectorizer, stop_words)
             st.success(f"Sentiment: {result}")
 
     # -------- KEYWORD --------
     elif option == "🔥 Keyword Analysis":
-        keyword = st.text_input("Enter keyword (AI, India, Cricket)")
+        keyword = st.text_input("Enter keyword")
 
         if st.button("Fetch Tweets"):
-            tweets = get_tweets(keyword)
+            tweets = generate_tweets(keyword)
 
             pos, neg = 0, 0
 
@@ -146,16 +112,11 @@ def main():
                 else:
                     neg += 1
 
-            # metrics
             col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Positive", pos)
-            with col2:
-                st.metric("Negative", neg)
+            col1.metric("Positive", pos)
+            col2.metric("Negative", neg)
 
             show_charts(pos, neg)
-
-            st.subheader("📝 Tweets")
 
             with st.container(height=300):
                 for t in tweets:
@@ -164,16 +125,15 @@ def main():
 
     # -------- USER --------
     elif option == "👤 User Tweets":
-        username = st.text_input("Enter username (elonmusk)")
+        username = st.text_input("Enter username")
 
         if st.button("Fetch User Tweets"):
-            tweets = get_user_tweets(username)
+            tweets = generate_user_tweets(username)
 
             with st.container(height=300):
                 for t in tweets:
                     s = predict(t, model, vectorizer, stop_words)
                     st.markdown(card(t, s), unsafe_allow_html=True)
 
-# -------------------- RUN --------------------
 if __name__ == "__main__":
     main()
