@@ -1,5 +1,9 @@
 #  Real-Time Sentiment Analysis on Twitter Data Dashboard
 
+###🌐 Live Demo
+
+[🚀 Click Here to View Live Project](https://twitter-sentiment-analysis-sakshi-jadhav-24.streamlit.app/)
+
 ## 📌 Project Overview
 
 This project is a **Streamlit-based dashboard** that performs sentiment analysis on Twitter-like data.
